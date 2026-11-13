@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Passages C2 · météo Rennes</title>
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -31,7 +35,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0;background:#000;color:var(--ink);-webkit-font-smoothing:antialiased;}
   body{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;}
-  .page{max-width:800px;width:100%;margin:0 auto;padding:0 8px 8px;flex:1;display:flex;flex-direction:column;min-height:0;}
+  .page{max-width:800px;width:100%;margin:0 auto;padding:0 8px 4px;flex:1;display:flex;flex-direction:column;min-height:0;}
   .top{display:flex;justify-content:space-between;align-items:baseline;padding:0 6px 4px;}
   .top h1{font-family:var(--disp);font-size:22px;font-weight:600;margin:0;}
   .top h1 a{color:inherit;text-decoration:none;}
@@ -40,17 +44,17 @@
   .chart-wrap canvas{position:absolute;left:0;top:0;}
   .state{font-family:var(--mono);font-size:13px;color:var(--dim);padding:60px 0;text-align:center;}
   .state.err{color:#ff9a8f;}
-  .legend{display:flex;justify-content:center;gap:6px 20px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--dim);padding-top:6px;}
+  .legend{display:flex;justify-content:center;gap:6px 20px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--dim);padding-top:0;}
   .legend i{display:inline-block;width:18px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px;}
   .legend i.bar{height:10px;border:none;background:var(--precip);width:10px;border-radius:2px;}
 
   /* ---- Passages de bus (portée limitée à #transit) ---- */
-  #transit{max-width:800px;width:100%;margin:0 auto;padding:8px 14px 4px;font-family:sans-serif;color:#fff;}
-  #transit .passage{margin-bottom:.45rem;}
-  #transit .heure{font-size:2.5rem;font-weight:bold;line-height:1.1;}
-  #transit .detail{color:#fff;font-size:1.3rem;}
+  #transit{max-width:800px;width:100%;margin:0 auto;padding:6px 14px 2px;font-family:sans-serif;color:#fff;}
+  #transit .passage{margin-bottom:.15rem;}
+  #transit .heure{font-size:2.5rem;font-weight:bold;line-height:1;}
+  #transit .detail{color:#fff;font-size:1.3rem;line-height:1.15;}
   #transit #statut{color:#ff6b6b;}
-  #transit .entete{display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem;}
+  #transit .entete{display:flex;align-items:center;gap:.8rem;margin-bottom:.3rem;}
   #transit .logo{display:block;flex:none;}
   #transit .logo img{display:block;width:76px;height:76px;border:3px solid #fff;border-radius:18px;}
   #transit .arret{font-size:1.9rem;font-weight:bold;}
@@ -107,7 +111,7 @@ const labelsPlugin = {
       ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(0,8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0,9); ctx.lineTo(-3.6,3); ctx.lineTo(3.6,3); ctx.closePath(); ctx.fill(); ctx.restore();
       ctx.save(); ctx.fillStyle='#7ee2a8'; ctx.font='600 13px IBM Plex Mono, monospace'; ctx.textAlign='center';
-      ctx.fillText(w.bf, px, y+25); ctx.restore();
+      ctx.fillText(w.bf, px, y+22); ctx.restore();
     });
     // trait "maintenant"
     const px0 = x.getPixelForValue(0);
@@ -167,7 +171,7 @@ function draw(data){
     ]},
     options:{
       responsive:true, maintainAspectRatio:false, animation:false,
-      layout:{ padding:{ bottom:62, top:6, right:2 } },
+      layout:{ padding:{ bottom:34, top:6, right:2 } },
       interaction:{ mode:'index', intersect:false },
       plugins:{
         legend:{ display:false },
@@ -282,6 +286,9 @@ async function maj() {
 maj();
 setInterval(maj, CONFIG.refreshMs);
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {})); }
 </script>
 </body>
 </html>
