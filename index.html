@@ -75,7 +75,7 @@
     <span><i style="border-color:var(--temp)"></i>Température</span>
     <span><i style="border-color:var(--temp);border-top-style:dashed;opacity:.8"></i>Ressentie</span>
     <span><i class="bar"></i>Pluie mm · % probabilité</span>
-    <span><i style="border-color:var(--wind)"></i>Vent Bf</span>
+    <span style="margin-left:auto"><i style="border-color:var(--wind)"></i>Vent</span>
   </div>
 </div>
 <script>
@@ -103,16 +103,29 @@ const labelsPlugin = {
     });
     ctx.restore();
     // vent
-    const y = a.bottom + 36;
+    const y = a.bottom + 34;
     o.wind.forEach((w,i)=>{
       const px = x.getPixelForValue(i);
       ctx.save(); ctx.translate(px, y); ctx.rotate((w.dir+180)*Math.PI/180);
       ctx.strokeStyle=ctx.fillStyle='#7ee2a8'; ctx.lineWidth=1.8;
       ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(0,8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0,9); ctx.lineTo(-3.6,3); ctx.lineTo(3.6,3); ctx.closePath(); ctx.fill(); ctx.restore();
-      ctx.save(); ctx.fillStyle='#7ee2a8'; ctx.font='600 13px IBM Plex Mono, monospace'; ctx.textAlign='center';
-      ctx.fillText(w.bf, px, y+22); ctx.restore();
     });
+    // échelles de droite : mm (pluie) puis Bf (vent), alignées sur 4 graduations égales
+    ctx.save(); ctx.font='600 11px IBM Plex Mono, monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    const xBf = a.right + 20, xMm = a.right + 4;
+    for(let k=0;k<=4;k++){
+      const yy = yP.getPixelForValue(o.pStep*k);
+      const yb = chart.scales.yW.getPixelForValue(o.wStep*k);
+      const off = k===0 ? -7 : (k===4 ? 7 : 0);
+      ctx.fillStyle='#6db3f2'; ctx.fillText(fmt1(o.pStep*k).replace(/,0$/,''), xMm, yy+off);
+      ctx.fillStyle='#7ee2a8'; ctx.fillText(String(o.wStep*k), xBf, yb+off);
+    }
+    // noms des unités sous l'axe, à droite des heures
+    ctx.font='600 11px IBM Plex Mono, monospace'; ctx.textBaseline='alphabetic';
+    ctx.fillStyle='#6db3f2'; ctx.fillText('mm', xMm, a.bottom+19);
+    ctx.fillStyle='#7ee2a8'; ctx.fillText('Bf', xBf, a.bottom+19);
+    ctx.restore();
     // trait "maintenant"
     const px0 = x.getPixelForValue(0);
     ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.moveTo(px0,a.top); ctx.lineTo(px0,a.bottom); ctx.stroke(); ctx.restore();
@@ -125,6 +138,28 @@ const labelsPlugin = {
     });
   }
 };
+const ZONES = [[10,16,'#5b93e0'],[16,22,'#4cc36f'],[22,28,'#e0605a']];
+const zonesPlugin = {
+  id:'zones',
+  beforeDatasetsDraw(chart){
+    const { ctx, chartArea:a, scales:{ yT } } = chart;
+    ctx.save(); ctx.globalAlpha = 0.30;
+    ZONES.forEach(([lo,hi,c])=>{
+      if(hi <= yT.min || lo >= yT.max) return;
+      const y1 = yT.getPixelForValue(Math.min(hi, yT.max)), y2 = yT.getPixelForValue(Math.max(lo, yT.min));
+      ctx.fillStyle = c; ctx.fillRect(a.left, y1, a.right - a.left, y2 - y1);
+    });
+    ctx.restore();
+    // pointillés : limite basse à 10 °C (bleu) et limite haute à 28 °C (rouge)
+    [[10,'#8db6ff'],[28,'#ff8a82']].forEach(([v,c])=>{
+      if(v < yT.min || v > yT.max) return;
+      const y = yT.getPixelForValue(v);
+      ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 1.6; ctx.setLineDash([2,5]);
+      ctx.beginPath(); ctx.moveTo(a.left, y); ctx.lineTo(a.right, y); ctx.stroke(); ctx.restore();
+    });
+  }
+};
+Chart.register(zonesPlugin);
 Chart.register(labelsPlugin);
 
 async function load(){
@@ -155,10 +190,12 @@ function draw(data){
   const prob = idx.map(i=>h.precipitation_probability ? h.precipitation_probability[i] : null);
   const times = idx.map(i=>h.time[i]);
   const days = []; idx.forEach((i,k)=>{ const t=parseT(h.time[i]); if(t.h===0 && k>0) days.push({i:k,label:DAY3[new Date(t.y,t.mo-1,t.d).getDay()]+' '+t.d}); });
+  const windF = idx.map(i=>kmhToBf(h.wind_speed_10m[i]));
+  const wStep = Math.max(2, Math.ceil((Math.max(...windF) + 1) / 4)), wMax = wStep * 4;
   const wind = idx.map(i=>({ bf:Math.round(kmhToBf(h.wind_speed_10m[i])), dir:h.wind_direction_10m[i] }));
   const lo = Math.min(...temps,...feels), hi = Math.max(...temps,...feels);
   const tMin = Math.floor(lo/2)*2 - 2, tMax = Math.ceil(hi/2)*2 + 2;
-  const pMax = Math.max(2, Math.ceil(Math.max(...mm)*1.25));
+  const pStep = Math.max(0.5, Math.ceil(Math.max(...mm) * 1.25 / 4 * 2) / 2), pMax = pStep * 4;
 
   if(chart) chart.destroy();
   const ctx = canvas.getContext('2d');
@@ -167,29 +204,30 @@ function draw(data){
     data:{ labels: idx.map(i=>pad(parseT(h.time[i]).h)+'h'), datasets:[
       { type:'bar', label:'Pluie', data:mm, yAxisID:'yP', backgroundColor:'rgba(109,179,242,0.8)', borderRadius:3, barPercentage:0.62, order:3 },
       { type:'line', label:'Ressentie', data:feels, yAxisID:'yT', borderColor:'rgba(255,168,102,0.85)', borderWidth:2, borderDash:[6,4], tension:0.35, pointRadius:0, order:2 },
+      { type:'line', label:'Vent', data:windF, yAxisID:'yW', borderColor:'#7ee2a8', borderWidth:2.6, tension:0.35, pointRadius:0, pointHoverRadius:4, order:0 },
       { type:'line', label:'Température', data:temps, yAxisID:'yT', borderColor:'#ffa866', borderWidth:3.4, tension:0.35, pointRadius:0, pointHoverRadius:5, order:1 }
     ]},
     options:{
       responsive:true, maintainAspectRatio:false, animation:false,
-      layout:{ padding:{ bottom:34, top:6, right:2 } },
+      layout:{ padding:{ bottom:20, top:6, right:22 } },
       interaction:{ mode:'index', intersect:false },
       plugins:{
         legend:{ display:false },
-        labels:{ prob, mm, wind, days },
+        labels:{ prob, mm, wind, days, pStep, wStep },
         tooltip:{ backgroundColor:'#05070a', borderColor:'#5a677c', borderWidth:1, titleColor:'#f4f7fb', bodyColor:'#e3e9f1',
           titleFont:{ family:'IBM Plex Mono', size:13 }, bodyFont:{ family:'IBM Plex Mono', size:12.5 },
           callbacks:{
             title: it => it.length ? title(times[it[0].dataIndex]) : '',
-            label: c => c.dataset.label==='Pluie' ? `Pluie : ${fmt1(c.parsed.y)} mm` + (prob[c.dataIndex]!=null ? ` (${prob[c.dataIndex]} %)` : '') : `${c.dataset.label} : ${c.parsed.y.toFixed(1).replace('.',',')} °C`,
-            afterBody: it => { const w = wind[it[0].dataIndex]; return `Vent : ${w.bf} Bf`; }
+            label: c => c.dataset.label==='Vent' ? `Vent : ${fmt1(c.parsed.y)} Bf` : c.dataset.label==='Pluie' ? `Pluie : ${fmt1(c.parsed.y)} mm` + (prob[c.dataIndex]!=null ? ` (${prob[c.dataIndex]} %)` : '') : `${c.dataset.label} : ${c.parsed.y.toFixed(1).replace('.',',')} °C`
           } }
       },
       scales:{
         x:{ grid:{ display:false }, border:{ color:'#3a4556' }, ticks:{ color:'#f4f7fb', font:{ family:'IBM Plex Mono', size:12 }, maxRotation:0, autoSkip:false } },
-        yT:{ position:'left', min:tMin, max:tMax, grid:{ color:'rgba(255,255,255,0.11)' }, border:{ display:false },
-             ticks:{ color:'#ffa866', font:{ family:'IBM Plex Mono', size:12 }, callback:v=>v+'°', stepSize:2, maxTicksLimit:8 } },
-        yP:{ position:'right', min:0, max:pMax, grid:{ display:false }, border:{ display:false },
-             ticks:{ color:'#6db3f2', font:{ family:'IBM Plex Mono', size:12 }, callback:v=>v+' mm', maxTicksLimit:5 } }
+        yT:{ position:'left', min:tMin, max:tMax, grid:{ color:'rgba(255,255,255,0.14)', tickLength:0, drawTicks:false }, border:{ display:false },
+             ticks:{ color:'#ffa866', font:{ family:'IBM Plex Mono', size:12 }, callback:v=>v+'°', stepSize:2, maxTicksLimit:8, mirror:true, padding:4 } },
+        yP:{ position:'right', min:0, max:pMax, grid:{ display:false, tickLength:0, drawTicks:false }, border:{ display:false },
+             ticks:{ display:false } },
+        yW:{ display:false, position:'right', min:0, max:wMax, grid:{ display:false } }
       }
     }
   });
